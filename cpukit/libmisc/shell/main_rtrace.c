@@ -341,8 +341,9 @@ rtems_trace_buffering_shell_trace (int argc, char *argv[])
 
   count = 0;
   r = 0;
+  int ab = 10;
 
-  while ((r < records) && (count < end))
+  while ((r < records) && (count < end) && ab--)
   {
     const uint32_t header = trace_buffer[r];
     const uint32_t func_index = header & 0xffff;
@@ -420,6 +421,85 @@ rtems_trace_buffering_file_write (int out, const void* vbuffer, ssize_t length)
     buffer += w;
   }
   return true;
+}
+
+static int
+rtems_trace_binary_print(int argc, char *argv[]){
+  uint32_t* trace_buffer;
+  uint32_t  records;
+  uint32_t  traces;
+  size_t    r;
+  uint8_t*  buffer;
+  size_t    length;
+
+  if(argc != 1)
+    return rtems_trace_buffering_wrong_number_of_args ();
+
+  if (!rtems_trace_buffering_present ())
+    return rtems_trace_buffering_no_trace_buffer_code ();
+
+  if (!rtems_trace_buffering_finished ())
+  {
+    printf("tracing still running\n");
+    return 0;
+  }
+
+  trace_buffer = rtems_trace_buffering_buffer ();
+  records = rtems_trace_buffering_buffer_in ();
+  traces = rtems_trace_names_size ();
+  
+  /*
+   * Endian detection.
+   */
+  printf("Endinan Detection\n");
+  printf("0x11223344\n");
+
+  /*
+   * Number of traces.
+   */
+  printf("Number of traces\n");
+  printf("%ld\n", traces);
+
+  /*
+   * The trace names.
+   */
+  printf("Trace Names\n");
+  for (r = 0; r < traces; ++r)
+  {
+    const char* name = rtems_trace_names (r);
+    printf("%s\n", name);
+  }
+
+  /*
+  * Printing trace signatures
+  */
+  printf("Trace Signatures\n");
+  for (r = 0; r < traces; ++r)
+  {
+    const rtems_trace_sig* sig = rtems_trace_signatures (r);
+    size_t                 s;
+
+    for ( s = 0; s < sig->argc; ++s)
+    {
+      const rtems_trace_sig_arg* arg = &sig->args[s];
+      size_t                     arg_len = strlen (arg->type) + 1;
+
+
+      printf("%ld\t",arg->size);
+      printf("%s\n",arg->type);
+    }
+  }
+  
+  /*
+  * Printing trace buffer contents
+  */
+  buffer = (uint8_t*) trace_buffer;
+  length = records * sizeof (uint32_t);
+  printf("Printing buffer contents");
+  while(length--){
+    printf("%d",*(buffer++));
+  }
+  return 0;
 }
 
 static int
@@ -638,6 +718,11 @@ static const rtems_trace_buffering_shell_cmd_t table[] =
     "save",
     rtems_trace_buffering_shell_save,
     " file                  : Save the trace buffer to a file"
+  },
+  {
+    "print",
+    rtems_trace_binary_print,
+    "                       : Print the binary trace on console"
   },
 };
 
